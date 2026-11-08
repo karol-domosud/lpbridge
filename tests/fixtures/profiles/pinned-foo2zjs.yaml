@@ -1,0 +1,13 @@
+id: pinned-foo2zjs
+name: Samsung ML-1670
+manufacturer: Samsung
+aliases: [Samsung ML-1675]
+match:
+  usb: [{vendor: "0x04e8", product: "0x3441"}]
+  device_id: "MDL:ML-1670"
+driver:
+  make: Samsung
+  model: ML-1670
+  ppd_spec: "cupsdriver:foo2zjs:foo2zjs:0/ppd/foo2zjs/Samsung-ML-1670.ppd"
+transport:
+  kind: usb-raw

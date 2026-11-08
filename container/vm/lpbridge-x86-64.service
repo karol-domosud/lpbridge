@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Karol Domosud
+
+[Unit]
+Description=lpbridge: register an x86-64 ELF interpreter (FEX, else qemu-x86_64)
+After=proc-sys-fs-binfmt_misc.mount
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/lpbridge/register-x86-64
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

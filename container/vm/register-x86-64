@@ -1,0 +1,32 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Karol Domosud
+
+# Register whatever can run x86-64 ELF binaries in this guest: FEX (a JIT,
+# near-native) when it proves it runs on this CPU, else qemu-x86_64 (slow,
+# always works). Exactly one of them holds the x86-64 magic; the name of the
+# winner is written for the guest agent to report. No Rosetta: Apple retires
+# it, and nothing here may depend on it.
+set -u
+modprobe binfmt_misc 2>/dev/null || true
+mountpoint -q /proc/sys/fs/binfmt_misc || mount -t binfmt_misc binfmt_misc /proc/sys/fs/binfmt_misc
+
+MAGIC='\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x3e\x00'
+MASK='\xff\xff\xff\xff\xff\xfe\xfe\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff'
+STATE=/run/lpbridge-x86-64
+
+for existing in FEX-x86_64 qemu-x86_64; do
+    [ -e "/proc/sys/fs/binfmt_misc/$existing" ] && { echo "$existing" > "$STATE"; exit 0; }
+done
+# FEX self-test: run the x86-64 dynamic loader (from libc6:amd64) under it
+if [ -x /usr/bin/FEX ] && [ -x /lib64/ld-linux-x86-64.so.2 ] \
+        && timeout 20 /usr/bin/FEX /lib64/ld-linux-x86-64.so.2 --version >/dev/null 2>&1; then
+    printf ':FEX-x86_64:M::%s:%s:/usr/bin/FEX:POCF' "$MAGIC" "$MASK" \
+        > /proc/sys/fs/binfmt_misc/register && { echo "FEX-x86_64" > "$STATE"; echo "x86-64: FEX"; exit 0; }
+fi
+if [ -x /usr/bin/qemu-x86_64-static ]; then
+    printf ':qemu-x86_64:M::%s:%s:/usr/bin/qemu-x86_64-static:OCF' "$MAGIC" "$MASK" \
+        > /proc/sys/fs/binfmt_misc/register && { echo "qemu-x86_64" > "$STATE"; echo "x86-64: qemu-x86_64 (FEX unavailable)"; exit 0; }
+fi
+echo "no x86-64 interpreter available" >&2
+exit 0

@@ -1,0 +1,94 @@
+{
+  "_comment": [
+    "Vendor driver packages the agent may download on first use. Never bundled (invariant 7).",
+    "match: regexes on the printer's make / model / 1284 device-id. packages: URL + sha256 of a .deb,",
+    "or of an archive with `members` (glob per architecture) naming the .deb files inside it.",
+    "arch: architecture of the binaries when the package itself is a .deb. arm64 runs natively, amd64 through FEX (qemu-x86_64 where FEX cannot run), i386 through qemu-i386.",
+    "amd64 through Rosetta, i386 cannot run (Rosetta is x86-64 only) -- listed for the record.",
+    "Sources: vendor download pages and the AUR PKGBUILDs that wrap them; sha256 verified by download."
+  ],
+  "drivers": [
+    {
+      "id": "canon-ufr2-6.30",
+      "vendor": "Canon",
+      "title": "Canon UFR II / UFRII LT printer driver 6.30 (cnrdrvcups-ufr2-uk)",
+      "match": {
+        "make": "^canon",
+        "device_id": "CMD:[^;]*UFR"
+      },
+      "packages": [
+        {
+          "url": "https://gdlp01.c-wss.com/gds/8/0100007658/48/linux-UFRII-drv-v630-m17n-07.tar.gz",
+          "sha256": "4ae588d8e4e14b25b74b8f8d2d5bee1e4621c27d2dd2e12ce7203e191693c755",
+          "members": {
+            "arm64": "*/ARM64/Debian/cnrdrvcups-ufr2-uk_*_arm64.deb",
+            "amd64": "*/x64/Debian/cnrdrvcups-ufr2-uk_*_amd64.deb"
+          }
+        }
+      ],
+      "note": "Canon ships a native arm64 build, which is what gets installed and what was verified (a page renders in about a second). The x86-64 build in the same archive spins without producing output under every interpreter tried; do not select it by hand."
+    },
+    {
+      "id": "canon-capt-2.71",
+      "vendor": "Canon",
+      "title": "Canon CAPT printer driver 2.71 (cndrvcups-capt + cndrvcups-common), x86-64 under FEX",
+      "match": {
+        "make": "^canon",
+        "device_id": "CMD:[^;]*CAPT|MDL:[^;]*LBP-?(810|1120|1210|2900|3000|3010|3018|3050|3100|3108|3150|3200|3210|3250|3300|3310|3500|5000|5050|5100|5300|6000|6018|6020|6030|6200|6300|7010|7018|7200|7210|9100)"
+      },
+      "packages": [
+        {
+          "url": "https://gdlp01.c-wss.com/gds/6/0100004596/05/linux-capt-drv-v271-uken.tar.gz",
+          "sha256": "8565a2fdc4f452bb8cf97ceadadd6614d12eac73e253ac6d59e61b8abae941be",
+          "members": {
+            "amd64": "*/64-bit_Driver/Debian/cndrvcups-*_amd64.deb",
+            "i386": "*/32-bit_Driver/Debian/cndrvcups-*_i386.deb"
+          }
+        }
+      ],
+      "note": "Experimental, and doubly so: CAPT expects its ccpd daemon's bidirectional link (through the lpbridge USB relay the stream is pushed one-way), and Canon's x86-64 UFR II module was observed spinning without output under Rosetta, qemu and FEX alike in this guest -- the CAPT module may behave the same. Not hardware-verified."
+    },
+    {
+      "id": "brother-mfc-9340cdw",
+      "vendor": "Brother",
+      "title": "Brother MFC-9340CDW LPR driver 1.1.2 + CUPS wrapper 1.1.4 (i386, qemu)",
+      "match": {
+        "make": "^brother",
+        "model": "^MFC-?9340CDW$"
+      },
+      "arch": "i386",
+      "packages": [
+        {
+          "url": "https://download.brother.com/welcome/dlf007027/mfc9340cdwlpr-1.1.2-1.i386.deb",
+          "sha256": "0591020f391dd904680e2a3beb9664e404cac144d5848f7091c9246b44bc8dfe"
+        },
+        {
+          "url": "https://download.brother.com/welcome/dlf007029/mfc9340cdwcupswrapper-1.1.4-0.i386.deb",
+          "sha256": "7ba2bd88eec76e7f278a220e1a8e32a3f4404280723c299bcdc4613b2bbb9c36"
+        }
+      ],
+      "note": "Brother's own GDI driver. The printer also speaks BR-Script/PCL and IPP Everywhere, so this is one candidate among several."
+    },
+    {
+      "id": "brother-hl3040cn",
+      "vendor": "Brother",
+      "title": "Brother HL-3040CN LPR driver 1.1.2 + CUPS wrapper 1.1.2 (i386, qemu)",
+      "match": {
+        "make": "^brother",
+        "model": "^HL-?3040CN$"
+      },
+      "arch": "i386",
+      "packages": [
+        {
+          "url": "https://www.brother.com/pub/bsc/linux/dlf/hl3040cnlpr-1.1.2-1.i386.deb",
+          "sha256": "8998283a7dae1d4cee9deae6edef42fe483471f50366fe8f42b49976a52c00e9"
+        },
+        {
+          "url": "https://www.brother.com/pub/bsc/linux/dlf/hl3040cncupswrapper-1.1.2-2.i386.deb",
+          "sha256": "452dfd5662b53e4db7b4eee10a28d23c71a053d27d964ca1dd00d9705b205116"
+        }
+      ],
+      "note": "GDI-only colour laser: this driver is the only way to print to it."
+    }
+  ]
+}

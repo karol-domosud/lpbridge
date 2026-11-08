@@ -1,0 +1,11 @@
+id: jetdirect-foomatic
+name: HP LaserJet 4000
+match:
+  mdns: ["_pdl-datastream._tcp"]
+driver:
+  ppd_spec: "foomatic:HP-LaserJet_4000/Postscript"
+  allow_driverless_override: true
+transport:
+  kind: jetdirect
+  host: 192.0.2.50
+  port: 9100

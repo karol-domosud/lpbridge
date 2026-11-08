@@ -1,0 +1,111 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Karol Domosud
+
+# lpbridge print engine -- a stock Ubuntu CUPS server with every open driver
+# family the distro ships, i.e. what a Linux desktop has after
+# `apt install cups printer-driver-all`.
+#
+# The lpbridge agent on the Mac never rebuilds this: it adds queues to this
+# cupsd (`lpadmin`, including `-m everywhere` for IPP Everywhere / AirPrint
+# printers), submits jobs over IPP and mirrors their state. Network printers
+# are driven by CUPS's own backends through the guest's NAT interface; USB
+# printers leave through the `lpbridge` backend and Apple's usb:// on the Mac.
+#
+# Pin the base by digest, not tag alone:
+#   podman build --build-arg BASE_IMAGE=docker.io/library/ubuntu@sha256:...
+ARG BASE_IMAGE=docker.io/library/ubuntu:24.04@sha256:69cecf4bbf72d2d44a9eef1b71fb98c7fb973d78af11399deccef19beb008ad9
+FROM ${BASE_IMAGE}
+
+# Extra driver packages a profile can request on top of the baked-in set.
+ARG DRIVER_PACKAGES=""
+
+# Every package comes from one frozen moment of the Ubuntu archive. Two
+# reasons, both load-bearing:
+#   * reproducibility -- the same recipe produces the same engine next year;
+#   * licence compliance -- we redistribute GPL/AGPL binaries, so the exact
+#     corresponding source must stay retrievable. snapshot.ubuntu.com keeps
+#     it forever; archive.ubuntu.com does not (see SOURCES.md).
+# Bump deliberately, never casually: a new timestamp means a new source
+# release asset. The timestamp must be *later than the base image's build
+# date* (`podman image inspect --format '{{.Created}}'`): apt never
+# downgrades, so anything the base image already carries at a newer version
+# than the snapshot would stay -- and, being Multi-Arch: same, would then
+# block the amd64/i386 copies the VM layer installs.
+#
+# snapshot.ubuntu.com/ubuntu/<ts> is one unified archive -- arm64, amd64 and
+# i386, every component -- so there is no ports/archive split to juggle.
+# It is https-only and the base image has no CA bundle, so the very first
+# update+install runs without TLS verification to fetch ca-certificates from
+# the snapshot itself; the archive signature (Signed-By) is what guarantees
+# integrity throughout, TLS only privacy.
+ARG SNAPSHOT=20260915T000000Z
+RUN set -eux; \
+    rm -f /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; \
+    printf '%s\n' \
+      'Types: deb deb-src' \
+      "URIs: https://snapshot.ubuntu.com/ubuntu/${SNAPSHOT}" \
+      'Suites: noble noble-updates noble-security' \
+      'Components: main universe' \
+      'Architectures: arm64' \
+      'Check-Valid-Until: no' \
+      'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' \
+      > /etc/apt/sources.list.d/lpbridge-snapshot.sources; \
+    printf '%s\n' \
+      'Acquire::Retries "5";' \
+      'Acquire::https::Timeout "60";' \
+      > /etc/apt/apt.conf.d/80lpbridge-snapshot; \
+    echo "$SNAPSHOT" > /etc/lpbridge-snapshot; \
+    NOTLS="-o Acquire::https::Verify-Peer=false -o Acquire::https::Verify-Host=false"; \
+    apt-get -qq $NOTLS update; \
+    DEBIAN_FRONTEND=noninteractive apt-get -qq $NOTLS install -y --no-install-recommends ca-certificates; \
+    rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        cups cups-daemon cups-client cups-filters cups-ipp-utils cups-ppdc \
+        libcupsimage2t64 ghostscript poppler-utils gawk xz-utils curl \
+        foomatic-db foomatic-db-engine openprinting-ppds \
+        printer-driver-gutenprint \
+        printer-driver-foo2zjs \
+        printer-driver-hpcups printer-driver-hpijs hpijs-ppds \
+        printer-driver-postscript-hp \
+        printer-driver-escpr \
+        printer-driver-splix \
+        printer-driver-pxljr \
+        printer-driver-min12xxw \
+        printer-driver-pnm2ppa \
+        printer-driver-c2esp printer-driver-c2050 \
+        printer-driver-m2300w \
+        printer-driver-sag-gdi \
+        printer-driver-cjet \
+        printer-driver-ptouch \
+        printer-driver-brlaser \
+        printer-driver-fujixerox \
+        printer-driver-oki \
+        printer-driver-dymo \
+        ${DRIVER_PACKAGES}; \
+    rm -rf /var/lib/apt/lists/*
+
+COPY cups/cupsd.conf        /etc/cups/cupsd.conf
+COPY cups/lpbridge-backend  /usr/lib/cups/backend/lpbridge
+COPY entrypoint.sh          /usr/local/bin/entrypoint.sh
+COPY ppdcaps.awk            /usr/local/lib/lpbridge/ppdcaps.awk
+COPY driver-packages.sh     /usr/local/lib/lpbridge/driver-packages.sh
+RUN set -eux; \
+    chmod 0700 /usr/lib/cups/backend/lpbridge; chown root:root /usr/lib/cups/backend/lpbridge; \
+    chmod +x /usr/local/bin/entrypoint.sh /usr/local/lib/lpbridge/driver-packages.sh; \
+    # the shared spool: /spool on the VM (virtio-fs) and a bind mount under podman
+    mkdir -p /spool; \
+    # cupsd writes here; also let the .drv sources be listed by cups-driverd
+    mkdir -p /var/cache/cups /var/spool/cups/tmp /run/cups; \
+    # sanity: cups-driverd must see the whole driver set
+    CUPS_DATADIR=/usr/share/cups CUPS_SERVERBIN=/usr/lib/cups CUPS_CACHEDIR=/tmp/cups \
+        /usr/lib/cups/daemon/cups-driverd list 1 0 "" 2>/dev/null | tr -c '[:print:]' '\n' \
+        | grep -c '^ppd-name' | awk '{ if ($1 < 5000) { print "too few PPDs: " $1; exit 1 } print $1 " PPDs" }'
+
+ENV TMPDIR=/tmp FOOMATIC_DB=/usr/share/foomatic
+
+EXPOSE 631
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["--serve"]

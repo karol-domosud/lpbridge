@@ -1,0 +1,48 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Karol Domosud
+
+# CUPS backend `lpbridge:///<printer-id>` -- the USB leg of the bridge.
+#
+# The guest cannot see USB. The driver chain runs here as for any other queue,
+# then this backend drops the finished device stream on the shared spool as
+#   /spool/outbound/<printer-id>/<cups-job-id>.prn
+# and the lpbridge agent on the Mac pushes it through Apple's own usb://
+# backend (a hidden raw queue). Installed mode 0700 so cupsd runs it as root:
+# the virtio-fs share is not writable by the `lp` user.
+#
+# Exit codes follow cups/backend.h: 0 ok, 1 failed (job stops), 4 CUPS_BACKEND_STOP.
+set -u
+
+if [ $# -eq 0 ]; then
+    echo 'direct lpbridge:/// "lpbridge" "USB printer relayed by the lpbridge agent"'
+    exit 0
+fi
+if [ $# -lt 5 ]; then
+    echo "Usage: lpbridge job-id user title copies options [file]" >&2
+    exit 1
+fi
+
+JOB="$1"
+INPUT="${6:-}"
+uri="${DEVICE_URI:-}"
+printer="${uri#lpbridge:///}"
+printer="${printer%%[/?]*}"
+case "$printer" in
+    ''|*[!A-Za-z0-9_.-]*) echo "ERROR: bad lpbridge device URI: $uri" >&2; exit 4 ;;
+esac
+
+SPOOL="${LPBRIDGE_SPOOL:-/spool}"
+dir="$SPOOL/outbound/$printer"
+mkdir -p "$dir" || { echo "ERROR: cannot write $dir" >&2; exit 1; }
+tmp="$dir/$JOB.prn.tmp"
+if [ -n "$INPUT" ]; then
+    cat "$INPUT" > "$tmp"
+else
+    cat > "$tmp"
+fi || { rm -f "$tmp"; echo "ERROR: could not spool job $JOB" >&2; exit 1; }
+[ -s "$tmp" ] || { rm -f "$tmp"; echo "ERROR: the driver produced no output" >&2; exit 1; }
+sync "$tmp" 2>/dev/null || sync
+mv -f "$tmp" "$dir/$JOB.prn"
+echo "INFO: handed $(wc -c < "$dir/$JOB.prn") bytes to the lpbridge agent" >&2
+exit 0

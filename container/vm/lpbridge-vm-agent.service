@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Karol Domosud
+
+[Unit]
+Description=lpbridge guest agent (address beacon + file RPC)
+After=spool.mount local-fs.target network.target cups.service lpbridge-x86-64.service
+Requires=spool.mount
+
+[Service]
+Type=simple
+ExecStartPre=/bin/sh -c 'until mountpoint -q /spool; do sleep 0.2; done'
+ExecStart=/usr/local/lib/lpbridge/lpbridge-vm-agent
+Restart=always
+RestartSec=1
+Nice=-2
+
+[Install]
+WantedBy=multi-user.target

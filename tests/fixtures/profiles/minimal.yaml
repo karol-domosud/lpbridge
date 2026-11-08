@@ -1,0 +1,3 @@
+id: minimal
+match:
+  usb: [{vendor: "0x03f0", product: "0x1234"}]

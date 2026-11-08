@@ -1,0 +1,18 @@
+{
+  "make": "Samsung",
+  "model": "ML-2580N",
+  "opts": [
+    "PageSize=A4",
+    "Resolution=600dpi"
+  ],
+  "job_meta": {
+    "id": 1,
+    "user": "golden",
+    "title": "golden",
+    "copies": 1
+  },
+  "ppd": "drv:///splix-samsung.drv/ml2580n.ppd",
+  "device_id": "MFG:Samsung;MDL:ML-2580 Series;CMD:SPL;",
+  "_note": "the driver the engine ranks first for this device-id is foomatic lj5gray (PCL); the hardware-verified stream is splix, pinned here",
+  "_golden": "captured 2026-09-17 through the Ubuntu 24.04 engine (Ghostscript 10.02.1, cups-filters 2.0, splix 2.0.0+svn315-7fakesync1ubuntu1). The earlier Debian-bookworm capture (gs 10.0.0) differed only in raster band lengths / run tables -- the rasterizer, not the driver. Hardware-verified stream: the Debian one; this one is expected to print identically but has not yet been sent to the printer."
+}

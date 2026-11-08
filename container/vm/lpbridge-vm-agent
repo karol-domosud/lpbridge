@@ -1,0 +1,127 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Karol Domosud
+
+# lpbridge guest agent.
+#
+# Two duties, both over the virtio-fs share (no vsock):
+#
+#  * tell the Mac how to reach cupsd: /spool/.vm-ip holds this guest's IPv4
+#    address on the NAT interface, /spool/.vm-ready appears once cupsd answers;
+#  * a tiny file RPC for what IPP can't do (lpadmin, package installs): the Mac
+#    writes /spool/inbox/<id>.req (one entrypoint.sh argument per line), we run
+#    it and write /spool/outbox/<id>/{stdout,stderr,exit} then touch .complete.
+set -u
+
+SPOOL=/spool
+INBOX="$SPOOL/inbox"
+OUTBOX="$SPOOL/outbox"
+
+mkdir -p "$INBOX" "$OUTBOX" "$SPOOL/outbound" "$SPOOL/transfer"
+
+# sshd runs only while the Mac holds a shell open (the agent starts and
+# stops ssh.service over the file RPC); make sure a stale one is not up
+systemctl stop ssh.service 2>/dev/null || true
+rm -f /root/.ssh/authorized_keys
+
+# what the user sees on login
+cat > /etc/motd <<'MOTD'
+
+  lpbridge print engine  --  Ubuntu 24.04, CUPS 2.4.7
+
+  This is the Linux side of your printers. You are root. Useful bits:
+    /spool/transfer     the "transfer" folder on your Mac -- put installer
+                        tarballs there and run them from here
+    lpinfo -m           every driver cupsd knows
+    lpstat -v / -o      queues and jobs; queue names are the lpbridge ids
+    /var/log/cups/error_log
+    FEX <x86-64 binary> / qemu-i386-static <i386 binary>   run x86 things
+
+  Changes you make here live on the engine disk until an engine update
+  replaces it. Keep the installer in the transfer folder so you can redo it;
+  .ppd and .deb files dropped on the app are re-installed automatically.
+  The engine shuts down a couple of minutes after you log out.
+
+  This is root on a throwaway Linux machine that can reach your network
+  (so vendor installers can fetch what they need) but not your Mac's files.
+  Run installers here the way you would on a Linux laptop: only ones you
+  trust. sshd listens only while your terminal is open.
+
+MOTD
+rm -f "$SPOOL/.vm-ready" "$SPOOL/.vm-ip"
+# A request left in the inbox by a previous life of this VM belongs to a
+# caller that has long since timed out. Never replay it: it was written for
+# a guest state that no longer exists, and (seen once) it can be the very
+# thing that broke that guest.
+for stale in "$INBOX"/*.req "$INBOX"/*.req.done; do
+    [ -e "$stale" ] && mv -f "$stale" "$stale.stale-$(date +%s)" 2>/dev/null
+done
+find "$INBOX" -name '*.stale-*' -mmin +60 -delete 2>/dev/null
+
+guest_ip() {
+    ip -4 -o addr show scope global 2>/dev/null | awk '{ sub(/\/.*/, "", $4); print $4; exit }'
+}
+
+# Ready means: an address to talk to and cupsd answering on it.
+for _ in $(seq 1 300); do
+    addr=$(guest_ip)
+    if [ -n "$addr" ] && curl -s -m 1 -o /dev/null "http://127.0.0.1:631/"; then
+        printf '%s\n' "$addr" > "$SPOOL/.vm-ip.tmp" && mv -f "$SPOOL/.vm-ip.tmp" "$SPOOL/.vm-ip"
+        break
+    fi
+    sleep 0.2
+done
+[ -f "$SPOOL/.vm-ip" ] || echo "lpbridge-vm-agent: no address or cupsd after 60s" >&2
+
+# the user's shell key (made on the Mac by the agent), accepted only from the
+# NAT gateway -- that address is the Mac itself, so other guests on the same
+# vmnet (podman machine, UTM VMs) are refused even with the key -- and with
+# every kind of forwarding off, so the engine cannot become a relay
+if [ -s "$SPOOL/.ssh-authorized-keys" ]; then
+    gw=$(ip -4 route show default 2>/dev/null | awk '{ print $3; exit }')
+    opts="no-port-forwarding,no-agent-forwarding,no-X11-forwarding"
+    [ -n "$gw" ] && opts="from=\"$gw\",$opts"
+    mkdir -p /root/.ssh && chmod 700 /root/.ssh
+    grep -v '^[[:space:]]*\(#\|$\)' "$SPOOL/.ssh-authorized-keys" | sed "s|^|$opts |" \
+        > /root/.ssh/authorized_keys.tmp \
+        && chmod 600 /root/.ssh/authorized_keys.tmp \
+        && mv -f /root/.ssh/authorized_keys.tmp /root/.ssh/authorized_keys
+    echo "lpbridge-vm-agent: shell key installed (from $gw)" >&2
+fi
+# which interpreters can run foreign binaries (the Mac reads these markers;
+# .vm-x86-64 holds the name of the one registered: FEX-x86_64 or qemu-x86_64)
+rm -f "$SPOOL/.vm-x86-64" "$SPOOL/.vm-i386"
+[ -s /run/lpbridge-x86-64 ] && cp /run/lpbridge-x86-64 "$SPOOL/.vm-x86-64"
+[ -e /proc/sys/fs/binfmt_misc/qemu-i386 ] && : > "$SPOOL/.vm-i386"
+: > "$SPOOL/.vm-ready"
+echo "lpbridge-vm-agent: ready at $(cat "$SPOOL/.vm-ip" 2>/dev/null)" >&2
+
+handle() {
+    req="$1"
+    id=$(basename "$req" .req)
+    out="$OUTBOX/$id"
+    mkdir -p "$out"
+    # each line of the .req file is one argument (models have spaces)
+    if xargs -a "$req" -d '\n' /usr/local/bin/entrypoint.sh \
+            > "$out/stdout" 2> "$out/stderr"; then
+        echo 0 > "$out/exit"
+    else
+        echo $? > "$out/exit"
+    fi
+    mv -f "$req" "$req.done" 2>/dev/null || rm -f "$req"
+    sync
+    : > "$out/.complete"
+}
+
+# Poll -- virtio-fs does not deliver inotify events for host-side writes, so
+# inotifywait would never fire. 0.2s is imperceptible next to a print job.
+while true; do
+    # the address can change after a DHCP renew; keep the Mac current
+    addr=$(guest_ip)
+    [ -n "$addr" ] && [ "$addr" != "$(cat "$SPOOL/.vm-ip" 2>/dev/null)" ] && printf '%s\n' "$addr" > "$SPOOL/.vm-ip"
+    for req in "$INBOX"/*.req; do
+        [ -e "$req" ] || continue
+        handle "$req"
+    done
+    sleep 0.2
+done

@@ -1,0 +1,116 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Karol Domosud
+
+# lpbridge micro-VM rootfs -- the print engine plus just enough to be a
+# bootable Virtualization.framework guest (no podman on the user's Mac).
+#
+# Built on top of the engine image so the driver set stays identical.
+#   podman build -t lpbridge:latest      -f container/Containerfile     container/
+#   podman build -t lpbridge-vm:latest   -f container/Containerfile.vm  container/
+# then tools/build-vm.sh turns this rootfs into an EFI-bootable disk image.
+#
+# The guest has one NIC on the Mac's vmnet NAT (vfkit `virtio-net,nat`): it
+# can open connections to LAN printers and the Internet, the Mac can reach
+# cupsd on it, nothing else can reach it.
+#
+# x86 vendor filters run under an interpreter registered through binfmt:
+#   x86-64  FEX (a JIT, near-native; MIT) when it runs on this CPU, else
+#           qemu-x86_64 (slow but always works). No Rosetta: Apple retires
+#           it from macOS 28, and nothing here may depend on it.
+#   i386    qemu-i386 (verified with Brother's real 32-bit filters)
+ARG FILTER_IMAGE=localhost/lpbridge:latest
+FROM ${FILTER_IMAGE}
+
+# FEX release 2609 for ARMv8.4+ (every Apple-silicon Mac). When the PPA
+# supersedes this build the file disappears there; attach it to the GitHub
+# release as a mirror and point FEX_URL at that (MIT allows it).
+ARG FEX_URL="https://ppa.launchpadcontent.net/fex-emu/fex/ubuntu/pool/main/f/fex-emu-armv8.4/fex-emu-armv8.4_2609-1~n_arm64.deb"
+ARG FEX_SHA256="c7cb0a45c4b144f96f0cbf0c586409f6d1ba1fe2dc2c76e19587a69f3864a4b1"
+
+RUN set -eux; \
+    # harmless rootless-build workaround: some userns setups can't run apt's
+    # `_apt` sandbox (setgroups EPERM)
+    echo 'APT::Sandbox::User "root";' > /etc/apt/apt.conf.d/00lpbridge; \
+    dpkg --add-architecture amd64; \
+    dpkg --add-architecture i386; \
+    sed -i 's/^Architectures: arm64$/Architectures: arm64 amd64 i386/' \
+        /etc/apt/sources.list.d/lpbridge-snapshot.sources; \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        systemd systemd-sysv systemd-boot-efi udev \
+        linux-image-virtual initramfs-tools \
+        dosfstools iproute2 openssh-server nano less \
+        # x86-64 runtime for vendor filters (Canon/Epson/Ricoh/Xerox ship
+        # x86-64 binaries linked against these)
+        libc6:amd64 libstdc++6:amd64 libgcc-s1:amd64 zlib1g:amd64 \
+        libcups2t64:amd64 libcupsimage2t64:amd64 libjpeg-turbo8:amd64 libjpeg62:amd64 \
+        libpng16-16t64:amd64 libusb-1.0-0:amd64 libxml2:amd64 \
+        # i386 runtime for 32-bit vendor filters (most Brother *lpr packages)
+        libc6:i386 libstdc++6:i386 libgcc-s1:i386 zlib1g:i386 \
+        libcups2t64:i386 libcupsimage2t64:i386 libjpeg-turbo8:i386 libpng16-16t64:i386 \
+        # the Brother cupswrapper scripts shell out to these
+        psutils a2ps; \
+    # Two binaries out of qemu-user-static: the package carries every
+    # architecture (~150 MB) and its own binfmt registrations would claim
+    # x86-64 unconditionally, which is FEX's when FEX works.
+    cd /tmp && apt-get download qemu-user-static && \
+        dpkg-deb -x qemu-user-static_*.deb /tmp/qemu && \
+        install -m 755 /tmp/qemu/usr/bin/qemu-i386-static   /usr/bin/qemu-i386-static && \
+        install -m 755 /tmp/qemu/usr/bin/qemu-x86_64-static /usr/bin/qemu-x86_64-static && \
+        rm -rf /tmp/qemu /tmp/qemu-user-static_*.deb && cd /; \
+    # FEX: the x86-64 JIT. Not in Ubuntu; the FEX project's own PPA build,
+    # pinned by sha256. Only the two runtime binaries are taken -- the package
+    # also drags in Qt for its configuration GUI, which a print engine has no
+    # use for. Runs x86-64 binaries straight against the multiarch libraries
+    # above; no separate x86 rootfs. MIT licence (packaging/THIRD-PARTY.md).
+    curl -fsSL "$FEX_URL" -o /tmp/fex.deb; \
+    echo "$FEX_SHA256  /tmp/fex.deb" | sha256sum -c -; \
+    dpkg-deb -x /tmp/fex.deb /tmp/fex; \
+    install -m 755 /tmp/fex/usr/bin/FEX /usr/bin/FEX; \
+    install -m 755 /tmp/fex/usr/bin/FEXServer /usr/bin/FEXServer; \
+    ln -sf FEX /usr/bin/FEXInterpreter; \
+    install -m 644 /tmp/fex/usr/share/doc/fex-emu-armv8.4/copyright /usr/share/doc/fex-emu-copyright; \
+    rm -rf /tmp/fex /tmp/fex.deb; \
+    # virtio-console is =m in the kernel -- force it (and the virtio
+    # transports + rootfs) into the initramfs so hvc0 and /dev/vda work early
+    printf 'virtio_pci\nvirtio_mmio\nvirtio_console\nvirtio_blk\nvirtio_net\nvirtiofs\next4\nbinfmt_misc\n' \
+        >> /etc/initramfs-tools/modules; \
+    sed -i 's/^MODULES=.*/MODULES=most/' /etc/initramfs-tools/initramfs.conf; \
+    update-initramfs -u -k all; \
+    rm -rf /var/lib/apt/lists/*; \
+    # NB: no `apt-get purge --auto-remove` here -- it cascades and can drop
+    # driver packages the resolver depends on.
+    rm -rf /usr/share/doc /usr/share/man /var/cache/apt/archives/*.deb /tmp/*
+
+# the shared spool comes in over virtio-fs; /spool/transfer is the folder
+# the user sees on the Mac (for installer tarballs and the like)
+RUN mkdir -p /spool; \
+    printf 'spool /spool virtiofs defaults,nofail 0 0\n' >> /etc/fstab
+
+COPY vm/lpbridge-vm-agent         /usr/local/lib/lpbridge/lpbridge-vm-agent
+COPY vm/register-x86-64           /usr/local/lib/lpbridge/register-x86-64
+COPY vm/lpbridge-vm-agent.service /etc/systemd/system/lpbridge-vm-agent.service
+COPY vm/lpbridge-x86-64.service   /etc/systemd/system/lpbridge-x86-64.service
+COPY vm/cups-restart.conf         /etc/systemd/system/cups.service.d/restart.conf
+COPY vm/sshd-lpbridge.conf        /etc/ssh/sshd_config.d/lpbridge.conf
+COPY vm/ssh-hostkeys.conf         /etc/systemd/system/ssh.service.d/hostkeys.conf
+COPY vm/qemu-i386.conf            /usr/lib/binfmt.d/lpbridge-qemu-i386.conf
+COPY vm/20-lpbridge.network       /etc/systemd/network/20-lpbridge.network
+RUN set -eux; \
+    chmod +x /usr/local/lib/lpbridge/lpbridge-vm-agent /usr/local/lib/lpbridge/register-x86-64; \
+    systemctl enable lpbridge-vm-agent.service lpbridge-x86-64.service \
+        systemd-networkd.service cups.service; \
+    # sshd is started per shell by the agent, never at boot
+    systemctl disable ssh.service ssh.socket 2>/dev/null || true; \
+    # host keys are made on first start, so every user's engine has its own
+    rm -f /etc/ssh/ssh_host_*; \
+    systemctl disable cups-browsed.service 2>/dev/null || true; \
+    systemctl mask systemd-networkd-wait-online.service \
+        NetworkManager-wait-online.service 2>/dev/null || true; \
+    # headless: no graphical target, quiet, fast
+    systemctl set-default multi-user.target; \
+    echo lpbridge-engine > /etc/hostname; \
+    printf 'root:lpbridge\n' | chpasswd
+
+# vfkit/EFI boots this; the kernel + initrd are pulled out to the ESP by
+# tools/build-vm.sh, which also writes the loader entry.

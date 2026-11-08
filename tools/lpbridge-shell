@@ -1,0 +1,13 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Karol Domosud
+#
+# Open a root shell in the lpbridge print engine (see agent/shellclient.py).
+# Inside lpbridge.app this lives in Contents/Resources/bin next to the
+# bundled Python, so it works on a Mac with no python3 of its own; from a
+# checkout it uses the system python3.
+here="$(cd "$(dirname "$0")" && pwd)"
+if [ -x "$here/../python/bin/python3" ]; then
+    PYTHONPATH="$here/.." exec "$here/../python/bin/python3" -m agent.shellclient "$@"
+fi
+PYTHONPATH="$here/.." exec python3 -m agent.shellclient "$@"

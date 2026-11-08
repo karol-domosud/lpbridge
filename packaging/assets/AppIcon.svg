@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- "Print" by Jo Szczepanska, https://www.svgrepo.com/svg/331557/print (CC BY-NC 4.0),
+     recoloured to the lpbridge palette; the original is AppIcon-source.svg.
+     See packaging/THIRD-PARTY.md. -->
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="1024" height="1024" viewBox="0 0 32 32">
+  <!-- upper background: accent blue -->
+  <path fill="#2E66EB" d="M32,29c0,1.65-1.35,3-3,3H3c-1.65,0-3-1.35-3-3V3c0-1.65,1.35-3,3-3h26c1.65,0,3,1.35,3,3V29z"/>
+  <!-- desk and paper slot: the in-app tile navy -->
+  <path fill="#212430" d="M0,16h32v13c0,1.65-1.35,3-3,3H3c-1.65,0-3-1.35-3-3V16z M8,10h16V8H8V10z"/>
+  <!-- printer top: paper white -->
+  <path fill="#EEF1F8" d="M26,7.8C26,6.806,25.194,6,24.2,6H7.8C6.806,6,6,6.806,6,7.8V11h20V7.8z M24,10H8V8h16V10z"/>
+  <!-- printer body: light grey-blue -->
+  <path fill="#C9D2E6" d="M6,11v5h20v-5H6z M19,15H8v-2h11V15z M22,15v-2h2v2H22z"/>
+  <!-- status light -->
+  <ellipse fill="#FF6B57" cx="3.5" cy="18.614" rx="1.5" ry="1.614"/>
+  <!-- cut-outs show the background; the second indicator -->
+  <path fill="#2E66EB" d="M24,13v2h-2v-2H24z M8,15h11v-2H8V15z M3.5,21C2.672,21,2,21.672,2,22.5S2.672,24,3.5,24 S5,23.328,5,22.5S4.328,21,3.5,21z"/>
+</svg>

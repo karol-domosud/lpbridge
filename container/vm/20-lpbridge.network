@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Karol Domosud
+
+# The single virtio NIC: DHCP from the Mac's vmnet NAT (192.168.64.0/24).
+[Match]
+Name=en* eth*
+
+[Network]
+DHCP=yes
+LinkLocalAddressing=ipv4
+
+[DHCPv4]
+UseDomains=false
+SendHostname=true
+Hostname=lpbridge-engine

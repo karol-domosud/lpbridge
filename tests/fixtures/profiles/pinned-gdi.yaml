@@ -1,0 +1,11 @@
+id: pinned-gdi
+name: Samsung ML-1210
+manufacturer: Samsung
+match:
+  device_id: "MDL:ML-1210"
+driver:
+  make: Samsung
+  model: ML-1210
+  ppd_spec: "foomatic:Samsung-ML-1210/gdi"
+transport:
+  kind: dryrun
