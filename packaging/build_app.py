@@ -116,7 +116,8 @@ def main():
                 "CFBundleIdentifier": "com.lpbridge.app", "CFBundleVersion": "6",
                 "CFBundleShortVersionString": VERSION, "CFBundlePackageType": "APPL",
                 "CFBundleExecutable": "lpbridge", "CFBundleIconFile": "AppIcon",
-                "NSHumanReadableCopyright": "Karol Domosud 2026 GPLv3",
+                "NSHumanReadableCopyright": "Karol Domosud 2026 GPLv3\n"
+                                            "Icon: “Print” by Jo Szczepanska (svgrepo.com), CC BY-NC 4.0, recoloured",
                 "LSMinimumSystemVersion": "13.0", "NSHighResolutionCapable": True,
                 "NSLocalNetworkUsageDescription": "lpbridge finds printers on your local network so you can add them to your Mac.",
                 "NSBonjourServices": ["_ipp._tcp", "_ipps._tcp", "_printer._tcp", "_pdl-datastream._tcp"]}
