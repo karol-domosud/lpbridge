@@ -22,18 +22,18 @@ Macs, as normal printers you print to with Cmd-P.
 *30-second demo ([MP4](https://karol-domosud.github.io/lpbridge/media/lpbridge-demo.mp4)): the real lpbridge app
 with sample printers. The macOS Print dialog is a mock-up.*
 
-### Real footage
+### Real recordings from development
 
-Unedited, muted recordings from development, with real printers and real paper.
+Recorded in a real environment, with real printers and real paper (muted).
 
 <table>
 <tr>
 <td align="center" valign="top">
-<a href="https://karol-domosud.github.io/lpbridge/media/real-samsung-laser.mp4"><img src="docs/media/real-samsung-laser-poster.png" height="300" alt="Real footage: Samsung ML-2580N laser printing a PDF from macOS Preview"></a><br>
+<a href="https://karol-domosud.github.io/lpbridge/media/real-samsung-laser.mp4"><img src="docs/media/real-samsung-laser-poster.png" height="300" alt="Real recording: Samsung ML-2580N laser printing a PDF from macOS Preview"></a><br>
 <sub><b>Samsung ML-2580N</b> (laser, network): set up in lpbridge, then a PDF printed from Preview. 44 s, recorded with an older 0.6 build.</sub>
 </td>
 <td align="center" valign="top">
-<a href="https://karol-domosud.github.io/lpbridge/media/real-dot-matrix.mp4"><img src="docs/media/real-dot-matrix-poster.png" height="300" alt="Real footage: dot-matrix printer printing a PDF page"></a><br>
+<a href="https://karol-domosud.github.io/lpbridge/media/real-dot-matrix.mp4"><img src="docs/media/real-dot-matrix-poster.png" height="300" alt="Real recording: dot-matrix printer printing a PDF page"></a><br>
 <sub><b>Dot-matrix printer</b>: a regular PDF printed with text and graphics. 39 s.</sub>
 </td>
 </tr>
