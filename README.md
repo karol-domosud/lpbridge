@@ -22,6 +22,23 @@ Macs, as normal printers you print to with Cmd-P.
 *30-second demo ([MP4](https://karol-domosud.github.io/lpbridge/media/lpbridge-demo.mp4)): the real lpbridge app
 with sample printers. The macOS Print dialog is a mock-up.*
 
+### Real footage
+
+Unedited, muted recordings from development, with real printers and real paper.
+
+<table>
+<tr>
+<td align="center" valign="top">
+<a href="https://karol-domosud.github.io/lpbridge/media/real-samsung-laser.mp4"><img src="docs/media/real-samsung-laser-poster.png" height="300" alt="Real footage: Samsung ML-2580N laser printing a PDF from macOS Preview"></a><br>
+<sub><b>Samsung ML-2580N</b> (laser, network): set up in lpbridge, then a PDF printed from Preview. 44 s, recorded with an older 0.6 build.</sub>
+</td>
+<td align="center" valign="top">
+<a href="https://karol-domosud.github.io/lpbridge/media/real-dot-matrix.mp4"><img src="docs/media/real-dot-matrix-poster.png" height="300" alt="Real footage: dot-matrix printer printing a PDF page"></a><br>
+<sub><b>Dot-matrix printer</b>: a regular PDF printed with text and graphics. 39 s.</sub>
+</td>
+</tr>
+</table>
+
 ## Features
 
 - **Connects printers macOS can't.** Runs the Linux driver for printers whose
@@ -34,7 +51,12 @@ with sample printers. The macOS Print dialog is a mock-up.*
   does not use macOS printer drivers or PPDs, which Apple deprecated in favour
   of driverless IPP Everywhere / AirPrint. macOS only ever sees a standard IPP
   Everywhere printer; the real driver runs in a Linux engine, with x86 drivers
-  translated by FEX / QEMU instead of Rosetta.
+  translated by [FEX](https://fex-emu.com/) / QEMU instead of Rosetta.
+- **Duplex.** Two-sided printing (long-edge and short-edge) from the normal
+  Print dialog, on printers whose driver supports it.
+- **Dot-matrix printers.** Old impact printers (IBM Proprinter and Epson ESC/P
+  compatibles, e.g. the Oki Microline ML3321) print in both text and graphics
+  mode -- proven by printing a regular PDF from macOS.
 - **No per-printer driver hacking.** As macOS moves to IPP Everywhere, the
   usual workaround -- patching or hand-writing a macOS driver for one
   particular printer -- stops working. lpbridge doesn't patch anything: it runs
@@ -127,6 +149,26 @@ rm -rf /Applications/lpbridge.app ~/Library/Application\ Support/lpbridge
 ```
 
 Remove the lpbridge printers in **System Settings → Printers & Scanners**.
+
+## Built on
+
+lpbridge is mostly glue. The hard parts are other people's work:
+
+- **[FEX](https://fex-emu.com/)** ([GitHub](https://github.com/FEX-Emu/FEX),
+  MIT) -- the x86-64 emulator for ARM64 Linux. FEX is what lets x86-only vendor
+  drivers (Samsung, Brother, Canon, ...) run on Apple Silicon without Rosetta,
+  so lpbridge keeps working after Apple removes Rosetta in macOS 28. Samsung's
+  x86-64 ULD driver renders a page under FEX in about 1.5 s. If lpbridge saves
+  your printer, consider supporting FEX.
+- **[QEMU](https://www.qemu.org/)** -- runs 32-bit x86 drivers (most older
+  Brother and Lexmark ones) and is the fallback where FEX can't run.
+- **[CUPS](https://openprinting.github.io/cups/), [OpenPrinting](https://openprinting.github.io/)
+  and the driver projects** (Gutenprint, HPLIP, foo2zjs, SpliX, brlaser, ...)
+  -- the actual drivers and the logic that picks them.
+- **[Ubuntu](https://ubuntu.com/)** -- the Linux engine, and
+  **[vfkit](https://github.com/crc-org/vfkit)** -- the tiny VM it runs in.
+
+Full list and licences: [packaging/THIRD-PARTY.md](packaging/THIRD-PARTY.md).
 
 ## Contributing
 
