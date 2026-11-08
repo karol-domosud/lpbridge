@@ -17,6 +17,11 @@
 lpbridge makes printers that only have a Linux driver work on Apple Silicon
 Macs, as normal printers you print to with Cmd-P.
 
+[![Watch the 30-second demo](docs/media/lpbridge-demo-poster.png)](docs/media/lpbridge-demo.mp4)
+
+*30-second demo ([MP4](docs/media/lpbridge-demo.mp4)): the real lpbridge app
+with sample printers. The macOS Print dialog is a mock-up.*
+
 ## Features
 
 - **Connects printers macOS can't.** Runs the Linux driver for printers whose
