@@ -136,3 +136,9 @@ separately licensed software (CUPS, Ghostscript, OpenPrinting drivers,
 Ubuntu); see [SOURCES.md](SOURCES.md) and
 [packaging/THIRD-PARTY.md](packaging/THIRD-PARTY.md). lpbridge is not an
 Ubuntu or Canonical product.
+
+App icon: ["Print"](https://www.svgrepo.com/svg/331557/print) by
+[Jo Szczepanska](https://www.svgrepo.com/author/Jo%20Szczepanska/)
+(svgrepo.com), [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/),
+recoloured. It is licensed separately from the code: commercial
+redistributors must replace it.
